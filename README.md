@@ -2,6 +2,22 @@
     EU Digital COVID Certificate Verifier App - Android
 </h1>
 
+# Specialization for Verifying Austrian Digital COVID Certificates
+
+This repository is a fork of
+[eu-digital-green-certificates/dgca-verifier-app-android](https://github.com/eu-digital-green-certificates/dgca-verifier-app-android),
+which contains the source code for a reference implementation of the EU Digital COVID
+Certificate Verifier App for Android. Whereas the latter is configured to work in
+a test environment only, the fork adds support for the verification of production
+certificates issued by the Austrian Health Authorities (similar to the official apps
+issued by the Austrian Government at [https://greencheck.gv.at](https://greencheck.gv.at)).
+
+To this end, the corresponding digital signing key (DSC) for Austria needs to be present in
+the app's key store. This DSC can be obtained, for example, from
+https://de.dscg.ubirch.com/trustList/DSC/ or extracted from the official
+[GreenCheck](https://greencheck.gv.at) (web)app. As of now, the latter approach has
+been implemented. The implementation of the former is left for future enhancements.
+
 <p align="center">
     <a href="/../../commits/" title="Last Commit"><img src="https://img.shields.io/github/last-commit/eu-digital-green-certificates/dgca-verifier-app-android?style=flat"></a>
     <a href="/../../issues" title="Open Issues"><img src="https://img.shields.io/github/issues/eu-digital-green-certificates/dgca-verifier-app-android?style=flat"></a>
