@@ -58,6 +58,10 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.*
 import javax.inject.Inject
+import java.security.cert.CertificateFactory
+import java.io.ByteArrayInputStream
+import java.security.cert.CertificateException
+import com.fasterxml.jackson.databind.ObjectMapper
 
 enum class GeneralVerificationResult {
     SUCCESS, FAILED, RULES_VALIDATION_FAILED
@@ -189,7 +193,37 @@ class VerificationViewModel @Inject constructor(
 
         val base64EncodedKid = kid.toBase64()
         val certificates = verifierRepository.getCertificatesBy(base64EncodedKid)
-        if (certificates.isEmpty()) {
+        //BEGIN DCC DSC AUT
+        // The openssl command can be used to get the sha256 hash of the der format of the pem certificate:
+        // openssl x509 -in <pem filename> -outform der | openssl dgst -sha256
+        val sCert:String = "-----BEGIN CERTIFICATE-----\nMIIB7zCCAZagAwIBAgIKAXnM+L47fmBcezAKBggqhkjOPQQDAjBEMQswCQYDVQQG\nEwJBVDEPMA0GA1UECgwGQk1TR1BLMQwwCgYDVQQFEwMwMDExFjAUBgNVBAMMDUFU\nIERHQyBDU0NBIDEwHhcNMjEwNjAyMTM0NTI0WhcNMjMwNjAyMTM0NTI0WjBGMQsw\nCQYDVQQGEwJBVDEPMA0GA1UECgwGQk1TR1BLMQ8wDQYDVQQFEwYwMDEwMDExFTAT\nBgNVBAMMDEFUIERHQyBEU0MgMTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABGBN\nuKiCpnXH0VlIdk6pJZH2ep8jQaV+FR3izMXxZfK5EPGZLtG3Jx+TmV3JJErfrSrP\nhRmfbSidVbTQ5nnZS+ujbjBsMA4GA1UdDwEB/wQEAwIHgDAdBgNVHQ4EFgQUNs2s\nmrjBhuR5Bqxl6teE1x1o2ycwHwYDVR0jBBgwFoAUHyKsHGUWKbTBmLNjb7/dCZ27\ne3swGgYDVR0QBBMwEYEPMjAyMTEyMTYxNDQ1MjRaMAoGCCqGSM49BAMCA0cAMEQC\nIDjXHnyzq3sTisMX1uY8xQ2ZqCRL2xmxtYOPhSZ9ZacYAiAqHUMOC7WNgq4h28n3\n1WLc1mMPAYauWslSEwnXC79AGw==\n-----END CERTIFICATE-----"
+        val certFactory: CertificateFactory = CertificateFactory.getInstance("X.509")
+        val bytes: ByteArrayInputStream = sCert.byteInputStream()
+        val crt: X509Certificate = certFactory.generateCertificate(bytes) as X509Certificate
+        val certificatesAUT = certificates.plusElement(crt)
+        // check validity of DSC (partially)
+        try {
+            crt.checkValidity()
+        }
+        catch (e: CertificateException) {
+            Timber.d("Certificate validation failed: " + e.message)
+            return InnerVerificationResult(
+                noPublicKeysFound = false,
+                certificateExpired = true,
+                greenCertificateData = greenCertificateData,
+                isApplicableCode = isApplicableCode,
+                base64EncodedKid = base64EncodedKid
+            )
+        }
+        //todo dump info; e.g., via greenCertificateData?.hcertJson
+        //readme update for AUT feature
+        //web service call for DSC AUT download and update
+        val om = ObjectMapper()
+        val json = om.readTree(greenCertificateData?.hcertJson)
+        val s = om.writerWithDefaultPrettyPrinter().writeValueAsString(json)
+        Timber.d(s)
+        //END DCC DSC AUT
+        if (certificatesAUT.isEmpty()) {
             Timber.d("Verification failed: failed to load certificate")
             return InnerVerificationResult(
                 greenCertificateData = greenCertificateData,
@@ -199,7 +233,7 @@ class VerificationViewModel @Inject constructor(
         }
         val noPublicKeysFound = false
         var certificateExpired = false
-        certificates.forEach { innerCertificate ->
+        certificatesAUT.forEach { innerCertificate ->
             cryptoService.validate(
                 cose,
                 innerCertificate,
